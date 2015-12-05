@@ -58,7 +58,7 @@ class JuliaSet:
         plane.draw_msg(self.c_str)
 
     def draw_cpoint(self, plane):
-        plane.draw_point(plane.convert_to_screen(self.c), (255, 0, 0))
+        plane.draw_complex(self.c, (255, 0, 0))
 
 seeds = (
     complex(PHI, PHI),

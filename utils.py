@@ -6,6 +6,7 @@ import cmath, math, pygame, os, time, colorsys, sys, random
 from pygame.locals import *
 import pygame.draw, pygame.image
 import numpy as N
+import subprocess
 
 class Window:
     def __init__(self, screen_size):
@@ -101,16 +102,12 @@ class Path:
             for point in N.linspace(a, b, size):
                 yield(point)
 
-    def sin(self, size, factor = 0.23, cycles = 1, direction="left"):
+    def sin(self, size, factor = 0.23, cycles = 1, sign = 1):
         for a, b in self.points_pairs():
             idx = 0
             angle = cmath.phase(b - a)
             distance = cmath.polar(b - a)[0]
             sinx = N.linspace(0, distance, size)
-            if direction == "left" or (angle >= -0.5 * math.pi and angle <= 0.5 * math.pi):
-                sign = 1
-            else:
-                sign = -1
             siny = map(lambda x: sign * math.sin(cycles * x * math.pi / float(distance)), sinx)
             for idx in xrange(size):
                 p = (sinx[idx], siny[idx] * factor)
@@ -125,6 +122,81 @@ class Path:
         y1 = scipy.interpolate.spline(t, self.ypath, nt)
         for pos in xrange(len(nt)):
             yield complex(x1[pos], y1[pos])
+
+# Audio mod generator
+class Filter:
+    def __init__(self, bpass, bstop, ftype='butter'):
+        import scipy.signal.filter_design as fd
+        import scipy.signal.signaltools as st
+        self.b, self.a = fd.iirdesign(bpass, bstop, 1, 100, ftype=ftype, output='ba')
+        self.ic = st.lfiltic(self.b, self.a, (0.0,))
+    def filter(self, data):
+        import scipy.signal.signaltools as st
+        res = st.lfilter(self.b, self.a, data, zi=self.ic)
+        self.ic = res[-1]
+        return res[0]
+
+class AudioMod:
+    def __init__(self, filename, frames, filter_type, delay = 10.0):
+        self.frames = frames
+        self.mod = N.zeros(frames)
+        if not os.path.isfile(filename):
+            print "Could not load %s" % filename
+            return
+        self.cache_filename = "%s.mod" % filename
+        if not os.path.isfile(self.cache_filename):
+            if filter_type == 1:
+                self.fp = Filter(0.01, 0.1, ftype='ellip')
+            elif filter_type == 2:
+                self.fp = Filter((0.1, 0.2),  (0.05, 0.25), ftype='ellip')
+            wave_values = self.load_wave(filename)
+            open(self.cache_filename, "w").write("\n".join(map(str, wave_values))+"\n")
+        else:
+            wave_values = map(float, open(self.cache_filename).readlines())
+        imp = 0.0
+        for i in xrange(0, self.frames):
+            if wave_values[i] >= imp:
+                imp = wave_values[i]
+            else:
+                delta = (imp - wave_values[i]) / delay
+                imp -= delta
+            self.mod[i] = imp
+
+    def load_wave(self, filename):
+        import wave
+        wav = wave.open(filename, "r")
+        if wav.getsampwidth() != 2 or wav.getnchannels() != 1:
+            print "Only support mono 16bit encoding..."
+            exit(1)
+
+        # Read all frames
+        buf = wav.readframes(wav.getnframes())
+
+        # Convert to float array [-1; 1]
+        w = N.fromstring(buf, N.int16) / float((2 ** (2 * 8)) / 2)
+
+        step = wav.getnframes() / self.frames + 1
+        wave_values = []
+        for i in xrange(0, wav.getnframes(), step):
+            wf = w[i:i+step]
+            if self.fp:
+                wf = self.fp.filter(wf)
+
+            v = N.max(N.abs(wf))
+            wave_values.append(float(v))
+        return wave_values
+
+    def plot(self):
+        p = subprocess.Popen(['gnuplot'], stdin=subprocess.PIPE)
+        open("/tmp/plot", "w").write("\n".join(map(lambda x: str(self.get(x)), range(0, self.frames))))
+        #for i in xrange(0, self.frames):
+
+        p.stdin.write("plot '/tmp/plot' with lines\n")
+        p.wait()
+
+    def get(self, frame):
+        return self.mod[frame]
+
 
 
 def main(argv):
