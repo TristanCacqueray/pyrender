@@ -10,7 +10,7 @@ import subprocess
 
 #constants
 if "RECORD_DIR" in os.environ:
-    SIZE=5
+    SIZE=6
 else:
     SIZE=4
 if "FAST_RENDER" in os.environ:
@@ -99,6 +99,7 @@ class Path:
     def __init__(self, points, size):
         self.points = points
         self.size = size
+        self.len_pairs = float(len(points) - 1)
         self.xpath = N.array(map(lambda x: x.__getattribute__("real"), self.points))
         self.ypath = N.array(map(lambda x: x.__getattribute__("imag"), self.points))
 
@@ -108,7 +109,7 @@ class Path:
 
     def lines(self):
         for a, b in self.points_pairs():
-            for point in N.linspace(a, b, self.size):
+            for point in N.linspace(a, b, self.size / self.len_pairs):
                 yield(point)
 
     def sin(self, factor = 0.23, cycles = 1, sign = 1, maxy = 1.0):
@@ -116,9 +117,9 @@ class Path:
             idx = 0
             angle = cmath.phase(b - a)
             distance = cmath.polar(b - a)[0]
-            sinx = N.linspace(0, distance, self.size)
+            sinx = N.linspace(0, distance, self.size / self.len_pairs)
             siny = map(lambda x: sign * maxy * math.sin(cycles * x * math.pi / float(distance)), sinx)
-            for idx in xrange(self.size):
+            for idx in xrange(int(self.size / self.len_pairs)):
                 p = (sinx[idx], siny[idx] * factor)
                 yield a + rotate_point(p, angle)
 
