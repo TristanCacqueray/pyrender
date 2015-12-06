@@ -8,6 +8,14 @@ import pygame.draw, pygame.image
 import numpy as N
 import subprocess
 
+#constants
+if "RECORD_DIR" in os.environ:
+    SIZE=5
+else:
+    SIZE=4
+if "FAST_RENDER" in os.environ:
+    SIZE=2
+
 class Window:
     def __init__(self, screen_size):
         pygame.init()
@@ -64,10 +72,10 @@ class ComplexPlane(Window):
         )
 
     def convert_to_screen(self, plane_coord):
-        return (
+        return [
             int((plane_coord.real - self.offset[0]) * self.scale[0]),
             self.screen_size[1] - int((plane_coord.imag - self.offset[1]) * self.scale[1])
-        )
+        ]
 
     def draw_complex(self, complex_coord, color = [242]*3):
         self.draw_point(self.convert_to_screen(complex_coord), color)
@@ -88,8 +96,9 @@ def rotate_point(point, angle):
                    point[0] * math.sin(angle) + point[1] * math.cos(angle))
 
 class Path:
-    def __init__(self, points):
+    def __init__(self, points, size):
         self.points = points
+        self.size = size
         self.xpath = N.array(map(lambda x: x.__getattribute__("real"), self.points))
         self.ypath = N.array(map(lambda x: x.__getattribute__("imag"), self.points))
 
@@ -97,27 +106,27 @@ class Path:
         for idx in xrange(len(self.points) - 1):
             yield (self.points[idx], self.points[idx + 1])
 
-    def lines(self, size):
+    def lines(self):
         for a, b in self.points_pairs():
-            for point in N.linspace(a, b, size):
+            for point in N.linspace(a, b, self.size):
                 yield(point)
 
-    def sin(self, size, factor = 0.23, cycles = 1, sign = 1):
+    def sin(self, factor = 0.23, cycles = 1, sign = 1, maxy = 1.0):
         for a, b in self.points_pairs():
             idx = 0
             angle = cmath.phase(b - a)
             distance = cmath.polar(b - a)[0]
-            sinx = N.linspace(0, distance, size)
-            siny = map(lambda x: sign * math.sin(cycles * x * math.pi / float(distance)), sinx)
-            for idx in xrange(size):
+            sinx = N.linspace(0, distance, self.size)
+            siny = map(lambda x: sign * maxy * math.sin(cycles * x * math.pi / float(distance)), sinx)
+            for idx in xrange(self.size):
                 p = (sinx[idx], siny[idx] * factor)
                 yield a + rotate_point(p, angle)
 
-    def splines(self, size):
+    def splines(self):
         import scipy.interpolate
         t = N.arange(self.xpath.shape[0], dtype=float)
         t /= t[-1]
-        nt = N.linspace(0, 1, size)
+        nt = N.linspace(0, 1, self.size)
         x1 = scipy.interpolate.spline(t, self.xpath, nt)
         y1 = scipy.interpolate.spline(t, self.ypath, nt)
         for pos in xrange(len(nt)):
@@ -213,7 +222,7 @@ def main(argv):
         plane.draw_axis()
 
 
-        path = Path(current_path)
+        path = Path(current_path, 300)
         current_path += (final_path - current_path) / 24.0
         if (frame+1) % 100 == 0:
             t = final_path
@@ -221,13 +230,13 @@ def main(argv):
             src_path = t
             current_path = src_path
 
-        for point in path.lines(23):
+        for point in path.lines():
             plane.draw_complex(point)
 
-        for point in path.sin(42, 0.2 * math.cos(frame / 7.0), 7 * (abs(math.sin(frame / 60.0)))):
+        for point in path.sin(0.2 * math.cos(frame / 7.0), 7 * (abs(math.sin(frame / 60.0)))):
             plane.draw_complex(point, color=(42,120,23))
 
-        for point in path.splines(500):
+        for point in path.splines():
             plane.draw_complex(point, color=(120,10,50))
 
         pygame.display.update()
@@ -239,4 +248,7 @@ def main(argv):
         clock.tick(12)
 
 if __name__ == "__main__":
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except KeyboardInterrupt:
+        pass
