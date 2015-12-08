@@ -6,7 +6,7 @@ import cmath, math, pygame, os, time, colorsys, sys, random
 from pygame.locals import *
 import pygame.draw, pygame.image
 import numpy as N
-import subprocess
+import subprocess, multiprocessing
 
 #constants
 if "RECORD_DIR" in os.environ:
@@ -108,11 +108,18 @@ class Path:
             yield (self.points[idx], self.points[idx + 1])
 
     def lines(self):
+        path = []
         for a, b in self.points_pairs():
             for point in N.linspace(a, b, self.size / self.len_pairs):
-                yield(point)
+                path.append(point)
+        return path
+
+    def gen_lines(self):
+        path = self.lines()
+        for c in path: yield c
 
     def sin(self, factor = 0.23, cycles = 1, sign = 1, maxy = 1.0):
+        path = []
         for a, b in self.points_pairs():
             idx = 0
             angle = cmath.phase(b - a)
@@ -121,17 +128,28 @@ class Path:
             siny = map(lambda x: sign * maxy * math.sin(cycles * x * math.pi / float(distance)), sinx)
             for idx in xrange(int(self.size / self.len_pairs)):
                 p = (sinx[idx], siny[idx] * factor)
-                yield a + rotate_point(p, angle)
+                path.append(a + rotate_point(p, angle))
+        return path
+
+    def gen_sin(self, factor = 0.23, cycles = 1, sign = 1, maxy = 1.0):
+        path = self.sin()
+        for c in path: yield c
 
     def splines(self):
         import scipy.interpolate
+        path = []
         t = N.arange(self.xpath.shape[0], dtype=float)
         t /= t[-1]
         nt = N.linspace(0, 1, self.size)
         x1 = scipy.interpolate.spline(t, self.xpath, nt)
         y1 = scipy.interpolate.spline(t, self.ypath, nt)
         for pos in xrange(len(nt)):
-            yield complex(x1[pos], y1[pos])
+            path.append(complex(x1[pos], y1[pos]))
+        return path
+
+    def gen_splines(self):
+        path = self.splines()
+        for c in path: yield c
 
 # Audio mod generator
 class Filter:
@@ -150,15 +168,15 @@ class AudioMod:
     def __init__(self, filename, frames, filter_type, delay = 10.0):
         self.frames = frames
         self.mod = N.zeros(frames)
-        if not os.path.isfile(filename):
-            print "Could not load %s" % filename
-            return
         self.cache_filename = "%s.mod" % filename
         if not os.path.isfile(self.cache_filename):
             if filter_type == 1:
                 self.fp = Filter(0.01, 0.1, ftype='ellip')
             elif filter_type == 2:
                 self.fp = Filter((0.1, 0.2),  (0.05, 0.25), ftype='ellip')
+            if not os.path.isfile(filename):
+                print "Could not load %s" % filename
+                return
             wave_values = self.load_wave(filename)
             open(self.cache_filename, "w").write("\n".join(map(str, wave_values))+"\n")
         else:
@@ -222,8 +240,7 @@ def main(argv):
         plane.fill()
         plane.draw_axis()
 
-
-        path = Path(current_path, 300)
+        path = Path(current_path, 600)
         current_path += (final_path - current_path) / 24.0
         if (frame+1) % 100 == 0:
             t = final_path
@@ -231,13 +248,13 @@ def main(argv):
             src_path = t
             current_path = src_path
 
-        for point in path.lines():
+        for point in path.gen_lines():
             plane.draw_complex(point)
 
-        for point in path.sin(0.2 * math.cos(frame / 7.0), 7 * (abs(math.sin(frame / 60.0)))):
+        for point in path.gen_sin(0.2 * math.cos(frame / 7.0), 7 * (abs(math.sin(frame / 60.0)))):
             plane.draw_complex(point, color=(42,120,23))
 
-        for point in path.splines():
+        for point in path.gen_splines():
             plane.draw_complex(point, color=(120,10,50))
 
         pygame.display.update()
