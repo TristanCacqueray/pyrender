@@ -61,7 +61,7 @@ class JuliaSet:
         if self.c.imag >= 0: i_sign = "+"
         else:                i_sign = ""
         c_str = "[%04d] z*z%s%.5f%s%.5fj" % (frame, r_sign, self.c.real, i_sign, self.c.imag)
-        plane.draw_msg(c_str)
+#        plane.draw_msg(c_str)
 #        plane.draw_msg("mod %02.3f / %02.3f" % (lowmod.get(frame), midmod.get(frame)), coord = (5, 20))
 
 
@@ -122,11 +122,15 @@ def main(argv):
     while True:
         # Animation 'scenes' description bellow:
 
+        if frame >= 4524: # phade out
+            scene_start, scene_len = 4524, 30
+            plane.set_view(radius = radius_path[frame - scene_start])
+
         if frame >= 4284: # Last zoom out
             scene_start, scene_len = 4284, 240.
             if frame == scene_start:
                 center_path = N.linspace(plane.center, 0j, scene_len)
-                radius_path = N.linspace(plane.radius, 3., scene_len)
+                radius_path = N.linspace(plane.radius, 3.5, (scene_len + 30))
                 c_path = []
                 path = Path((scene.c, -0.835625+0.2025j), scene_len)
                 for c in path.sin(0.005, cycles = 3):
@@ -138,15 +142,14 @@ def main(argv):
             scene_start, scene_len = 3804, 480.
             if frame == scene_start:
                 c_path = Path((scene.c, -0.730625+0.2390625j), scene_len / 2.0).sin(0.005, cycles = 2)
-                final_v = (-0.139582463466-0.0644258872651j)
-                final_v = -0.156582463466-0.0349258872651j
+                final_v = -0.159169507972-0.0692542695555j
                 center_path = N.linspace(plane.center, final_v, scene_len)
-                radius_path = N.linspace(plane.radius, 0.05, scene_len)
+                radius_path = N.linspace(plane.radius, 0.01, scene_len)
             mod = complex(0.02 * lowmod.get(frame), 0) #0.001 * midmod.get(frame))
             plane.set_view(center = center_path[frame - scene_start], radius = radius_path[frame - scene_start])
             if frame < (scene_start + scene_len / 2.0):
                 scene.c = c_path[frame - scene_start] + mod
-            else:
+            elif frame <= 4267:
                 scene.c = c_path[-1] + mod
 
         elif frame >= 3564: # arp + kick
@@ -156,11 +159,11 @@ def main(argv):
                 c_path = []
                 for c in path.sin(0.05, cycles = 5):
                     c_path.append(c)
-                radius_path = N.linspace(plane.radius, 1.5, scene_len / 3.0)
+                radius_path = N.linspace(plane.radius, 1.8, scene_len / 3.0)
                 center_path = N.linspace(plane.center, 0j, scene_len / 3.0)
             if frame < (scene_start + scene_len / 3.0):
                 plane.set_view(center = center_path[frame - scene_start], radius = radius_path[frame - scene_start])
-            mod = complex(-0.05 * lowmod.get(frame), 0.001 * midmod.get(frame))
+            mod = complex(-0.08 * lowmod.get(frame), 0.01 * midmod.get(frame))
             scene.c = c_path[frame - scene_start] + mod
 
         elif frame >= 3324: # arp
@@ -212,7 +215,6 @@ def main(argv):
         elif frame >= 2640: # 120bpm Beat loop1
             scene_start, scene_len = 2640, 192
             if frame == scene_start:
-                scene.effective_max_iter = 90
                 bulb_center = -0.125+0.7275j
                 c_path = Path((scene.c, -0.21875+0.71625j, -0.17375+0.823125j, -0.078125+0.82875j, -0.05+0.69j, -0.1325+0.658125j, -0.116875+0.84j),
                         scene_len).sin(0.008, cycles=3)
@@ -223,14 +225,12 @@ def main(argv):
             scene_start, scene_len = 2580, 60.
             if frame == 2580:
                 c_path = Path((scene.c, 0.355+0.1425j, 0.25+0.4575j, 0.0475+0.5925j, -0.10828125+0.638j), scene_len).splines()
-                scene.effective_max_iter = 69
             mod = complex(0.05 * lowmod.get(frame), 0.0004 * midmod.get(frame)) + complex(0.08 * lowmod.get(frame), 0.025)
             scene.c = c_path[frame - scene_start] + mod
 
         elif frame >= 2400: # slowly move c from 0.259 to 0.257
             scene_start, scene_len = 2400, 180.
             if frame == 2400:
-                scene.effective_max_iter = scene.max_iter
                 c_path = N.append(
                         N.linspace(scene.c.real, 0.259+0j, 30),
                         N.linspace(0.259+0j, 0.257+0j, 150)
@@ -250,15 +250,13 @@ def main(argv):
                                 0.41-0.031j,
                                 0.356-0.005j, # item #17
                         ), scene_len).splines()
-                radius_path = N.linspace(plane.radius, 1.8, scene_len)
+                radius_path = N.linspace(plane.radius, 1.3, scene_len)
                 center_path = N.linspace(plane.center, 0j,  scene_len)
             plane.set_view(center = center_path[frame - scene_start], radius = radius_path[frame - scene_start])
-            if frame >= 2250:
-                scene.effective_max_iter += 1
             mod = complex(0.1 * -lowmod.get(frame), 0.05 * midmod.get(frame))
             scene.c = c_path[frame - scene_start] + mod
 
-        elif frame >= 1440: # New beat -0.25-0.59j
+        elif frame >= 1440: # New beat
             scene_start, scene_len = 1440, 480.
             if frame == scene_start:
                 c_path = Path((scene.c, -0.157-1.105j, -0.107-1.08j, 0.062-0.75j, 0.152-0.75j), scene_len).sin(0.02, cycles = 4)
@@ -279,7 +277,7 @@ def main(argv):
             scene_start, scene_len = 1080, 240.
             if frame == scene_start:
                 c_path = Path((scene.c, -0.388325195312-0.758092773438j, -0.288657226563-0.979594726563j), scene_len).sin(0.005, cycles = 3)
-                radius_path = N.linspace(plane.radius, 2.0, scene_len)
+                radius_path = N.linspace(plane.radius, 1.5, scene_len)
                 center_path = N.linspace(plane.center, 0j,  scene_len)
             plane.set_view(center = center_path[frame - scene_start], radius = radius_path[frame - scene_start])
             mod = complex(0.15 * midmod.get(frame), 0.08 * lowmod.get(frame))
@@ -289,7 +287,7 @@ def main(argv):
             scene_start, scene_len = 840, 240.
             if frame == scene_start:
                 c_path = Path((scene.c, -0.69875-0.47625j, -0.56-0.685j), scene_len).sin(0.01, cycles = 5)
-                radius_path = N.linspace(plane.radius, 2.0, scene_len * 2)
+                radius_path = N.linspace(plane.radius, 1.5, scene_len * 2)
                 center_path = N.linspace(plane.center, 0j,  scene_len * 2)
             plane.set_view(center = center_path[frame - scene_start], radius = radius_path[frame - scene_start])
             mod = complex(-0.08 * lowmod.get(frame), -0.03 * midmod.get(frame))
@@ -334,7 +332,9 @@ def main(argv):
 
 
         # Mid freq modulate hue
-        scene.hue = 0.40 + 0.13 * midmod.get(frame)
+        # scene.hue = 0.40 + 0.13 * math.log10(1 + 9 * midmod.get(frame))
+        # print midmod.get(frame), math.log10(1 + 9 * midmod.get(frame))
+        # scene.hue = 0.40 + 0.13 * lowmod.get(frame)
 
 
         if frame >= start_frame:
@@ -352,7 +352,7 @@ def main(argv):
             if  e.type == MOUSEBUTTONDOWN: print plane.convert_to_plane(e.pos)
             elif e.type == KEYDOWN and e.key == K_ESCAPE: exit(0)
 
-    if not debug_path and "MID_RENDER" in os.environ:
+    if not debug_path: #and "MID_RENDER" in os.environ:
         return
 
     if debug_path:
