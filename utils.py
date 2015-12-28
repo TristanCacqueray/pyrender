@@ -5,7 +5,7 @@
 import cmath, math, pygame, os, time, colorsys, sys, random
 from pygame.locals import *
 import pygame.draw, pygame.image
-import numpy as N
+import numpy as np
 import subprocess, multiprocessing
 
 #constants
@@ -20,6 +20,7 @@ class Screen:
     def __init__(self, screen_size):
         pygame.init()
         self.screen = pygame.display.set_mode(screen_size)
+        self.windows = []
 
     def capture(self, frame):
         dname = os.environ['RECORD_DIR']
@@ -34,33 +35,32 @@ class Screen:
             print fname, e
             raise
 
-    def display_fullscreen(self, surface):
-        self.screen.blit(surface, (0, 0))
-        pygame.display.update()
+    def add(self, window, coord = (0, 0)):
+        self.windows.append((window, coord))
 
-    def display(self, surfaces):
-        for surface, coord in surfaces:
-            self.screen.blit(surface, coord)
+    def update(self):
+        for window, coord in self.windows:
+            self.screen.blit(window.surface, coord)
         pygame.display.update()
 
 class Window:
     def __init__(self, window_size):
-        self.window = pygame.Surface(window_size)
+        self.surface = pygame.Surface(window_size)
         self.font = pygame.font.SysFont(u'dejavusansmono', 18)
         self.window_size = window_size
 
     def fill(self, color = [0]*3):
-        self.window.fill(color)
+        self.surface.fill(color)
 
     def draw_msg(self, msg, coord = (5, 5), color = (180, 180, 255)):
         text = self.font.render(msg, True, color)
-        self.window.blit(text, coord)
+        self.surface.blit(text, coord)
 
     def draw_line(self, start_coord, end_coord, color = (28,28,28)):
-        pygame.draw.line(self.window, color, start_coord, end_coord)
+        pygame.draw.line(self.surface, color, start_coord, end_coord)
 
     def draw_point(self, coord, color = [242]*3):
-        self.window.set_at(coord, color)
+        self.surface.set_at(coord, color)
 
 class ComplexPlane(Window):
     def __init__(self, window_size):
@@ -118,8 +118,8 @@ class Path:
         self.points = points
         self.size = size
         self.len_pairs = float(len(points) - 1)
-        self.xpath = N.array(map(lambda x: x.__getattribute__("real"), self.points))
-        self.ypath = N.array(map(lambda x: x.__getattribute__("imag"), self.points))
+        self.xpath = np.array(map(lambda x: x.__getattribute__("real"), self.points))
+        self.ypath = np.array(map(lambda x: x.__getattribute__("imag"), self.points))
 
     def points_pairs(self):
         for idx in xrange(len(self.points) - 1):
@@ -128,7 +128,7 @@ class Path:
     def lines(self):
         path = []
         for a, b in self.points_pairs():
-            for point in N.linspace(a, b, self.size / self.len_pairs):
+            for point in np.linspace(a, b, self.size / self.len_pairs):
                 path.append(point)
         return path
 
@@ -142,7 +142,7 @@ class Path:
             idx = 0
             angle = cmath.phase(b - a)
             distance = cmath.polar(b - a)[0]
-            sinx = N.linspace(0, distance, self.size / self.len_pairs)
+            sinx = np.linspace(0, distance, self.size / self.len_pairs)
             siny = map(lambda x: sign * maxy * math.sin(cycles * x * math.pi / float(distance)), sinx)
             for idx in xrange(int(self.size / self.len_pairs)):
                 p = (sinx[idx], siny[idx] * factor)
@@ -156,9 +156,9 @@ class Path:
     def splines(self):
         import scipy.interpolate
         path = []
-        t = N.arange(self.xpath.shape[0], dtype=float)
+        t = np.arange(self.xpath.shape[0], dtype=float)
         t /= t[-1]
-        nt = N.linspace(0, 1, self.size)
+        nt = np.linspace(0, 1, self.size)
         x1 = scipy.interpolate.spline(t, self.xpath, nt)
         y1 = scipy.interpolate.spline(t, self.ypath, nt)
         for pos in xrange(len(nt)):
@@ -170,6 +170,41 @@ class Path:
         for c in path: yield c
 
 # Audio mod generator
+class SpectroGram:
+    def __init__(self, frame_size):
+        self.frame_size = frame_size
+        overlap_fac = 0.5
+        self.hop_size = np.int32(np.floor(self.frame_size * (1 - overlap_fac)))
+        self.fft_window = np.hanning(self.frame_size)
+        self.inner_pad = np.zeros(self.frame_size)
+        self.amps = {}
+
+    def transform(self, buf):
+        mono = np.mean(buf, axis=1)
+        windowed = self.fft_window * mono
+        padded = np.append(windowed, self.inner_pad)
+        spectrum = np.fft.fft(padded) / self.frame_size
+        autopower = np.abs(spectrum * np.conj(spectrum))
+        dbres = 20*np.log10(autopower[:self.frame_size/2])
+        clipres = np.clip(dbres, -40, 200) * 1 / 196.
+        self.freq = clipres
+
+    def get(self, freq_range, decay = 10.):
+        if freq_range not in self.amps:
+            self.amps[freq_range] = 0
+        if isinstance(freq_range, tuple):
+            if freq_range[1] == -1:
+                val = np.max(self.freq[freq_range[0]:])
+            else:
+                val = np.max(self.freq[freq_range[0]:freq_range[1]])
+        else:
+            val = self.freq[freq_range]
+        if val > self.amps[freq_range]:
+            self.amps[freq_range] = val
+        else:
+            self.amps[freq_range] -= (self.amps[freq_range] - val) / decay
+        return abs(self.amps[freq_range])
+
 class Filter:
     def __init__(self, bpass, bstop, ftype='butter'):
         import scipy.signal.filter_design as fd
@@ -185,7 +220,7 @@ class Filter:
 class AudioMod:
     def __init__(self, filename, frames, filter_type, delay = 10.0):
         self.frames = frames
-        self.mod = N.zeros(frames)
+        self.mod = np.zeros(frames)
         self.cache_filename = "%s.mod" % filename
         if not os.path.isfile(self.cache_filename):
             if filter_type == 1:
@@ -219,7 +254,7 @@ class AudioMod:
         buf = wav.readframes(wav.getnframes())
 
         # Convert to float array [-1; 1]
-        w = N.fromstring(buf, N.int16) / float((2 ** (2 * 8)) / 2)
+        w = np.fromstring(buf, np.int16) / float((2 ** (2 * 8)) / 2)
 
         step = wav.getnframes() / self.frames + 1
         wave_values = []
@@ -228,7 +263,7 @@ class AudioMod:
             if self.fp:
                 wf = self.fp.filter(wf)
 
-            v = N.max(N.abs(wf))
+            v = np.max(np.abs(wf))
             wave_values.append(float(v))
         return wave_values
 
@@ -250,9 +285,9 @@ def main(argv):
     screen = Screen(WINSIZE)
     plane = ComplexPlane(WINSIZE)
 
-    src_path = N.array((0j, -1j, 0j, 1j, 0j, -1-1j))
-    final_path = N.array((-1-1j, -1+1j, 1+1j, 0, 0.5-1j, 1-0.5j))
-    current_path = N.copy(src_path)
+    src_path = np.array((0j, -1j, 0j, 1j, 0j, -1-1j))
+    final_path = np.array((-1-1j, -1+1j, 1+1j, 0, 0.5-1j, 1-0.5j))
+    current_path = np.copy(src_path)
     clock = pygame.time.Clock()
     frame = 0
     while True:

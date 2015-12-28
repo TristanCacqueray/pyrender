@@ -19,7 +19,6 @@ class JuliaSet:
         self.c = c
         self.escape_limit = escape_limit
         self.max_iter = max_iter
-        self.screen = Screen(WINSIZE)
 
     def render(self, plane, frame):
         start_time = time.time()
@@ -28,7 +27,6 @@ class JuliaSet:
         plane.draw_axis()
         self.draw_function_msg(plane)
         self.draw_cpoint(plane)
-        self.screen.display_fullscreen(plane.window)
         print "%04d: %.2f sec: c/center/radius = '%s' '%s' %s" % (frame, time.time() - start_time, self.c, plane.center, plane.radius)
 
     def draw_fractal(self, plane):
@@ -80,8 +78,10 @@ def main(argv):
         print "Use 'qzsd' to change c value or RETURN key to browse known seeds"
 
     pygame.init()
+    screen = Screen(WINSIZE)
     clock = pygame.time.Clock()
     plane = ComplexPlane(WINSIZE)
+    screen.add(plane)
     c = random.choice(seeds)
     # Usage allow reuse of frame definition (c, plane center, radius)
     if len(argv) >= 2: c = complex(argv[1])
@@ -95,9 +95,10 @@ def main(argv):
         if redraw:
             frame += 1
             scene.render(plane, frame)
+            screen.update()
             redraw = False
             if "RECORD_DIR" in os.environ:
-                plane.capture(frame)
+                screen.capture(frame)
 
         for e in pygame.event.get():
             if e.type not in (KEYDOWN, MOUSEBUTTONDOWN):
