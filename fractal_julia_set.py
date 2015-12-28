@@ -19,6 +19,7 @@ class JuliaSet:
         self.c = c
         self.escape_limit = escape_limit
         self.max_iter = max_iter
+        self.screen = Screen(WINSIZE)
 
     def render(self, plane, frame):
         start_time = time.time()
@@ -27,7 +28,7 @@ class JuliaSet:
         plane.draw_axis()
         self.draw_function_msg(plane)
         self.draw_cpoint(plane)
-        pygame.display.update()
+        self.screen.display_fullscreen(plane.window)
         print "%04d: %.2f sec: c/center/radius = '%s' '%s' %s" % (frame, time.time() - start_time, self.c, plane.center, plane.radius)
 
     def draw_fractal(self, plane):
@@ -78,6 +79,7 @@ def main(argv):
         print "Use keyboard arrow to move window, 'a'/'e' to zoom in/out, 'r' to reset view"
         print "Use 'qzsd' to change c value or RETURN key to browse known seeds"
 
+    pygame.init()
     clock = pygame.time.Clock()
     plane = ComplexPlane(WINSIZE)
     c = random.choice(seeds)

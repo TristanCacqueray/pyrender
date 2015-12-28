@@ -19,13 +19,14 @@ class MandelbrotSet:
     def __init__(self, escape_limit=1e100, max_iter=69):
         self.escape_limit = escape_limit
         self.max_iter = max_iter
+        self.screen = Screen(WINSIZE)
 
     def render(self, plane, frame):
         start_time = time.time()
         plane.fill((0, 0, 0))
         self.draw_fractal(plane)
         plane.draw_axis()
-        pygame.display.update()
+        self.screen.display_fullscreen(plane.window)
         print "%04d: %.2f sec: center/radius = '%s' %s" % (frame, time.time() - start_time, plane.center, plane.radius)
 
     def draw_fractal(self, plane):
@@ -52,6 +53,7 @@ def main(argv):
         print "Left/right click to zoom in/out, Middle click to draw JuliaSet"
         print "Use keyboard arrow to move view and r to reset"
 
+    pygame.init()
     clock = pygame.time.Clock()
     plane = ComplexPlane(WINSIZE)
     plane.set_view(center = -0.8)

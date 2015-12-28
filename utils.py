@@ -16,26 +16,10 @@ else:
 if "FAST_RENDER" in os.environ:
     SIZE=2
 
-class Window:
+class Screen:
     def __init__(self, screen_size):
         pygame.init()
         self.screen = pygame.display.set_mode(screen_size)
-        self.font = pygame.font.SysFont(u'dejavusansmono', 18)
-        self.screen_size = screen_size
-        self.set_view(center = 0j, radius = 1.5)
-
-    def fill(self, color = [0]*3):
-        self.screen.fill(color)
-
-    def draw_msg(self, msg, coord = (5, 5), color = (180, 180, 255)):
-        text = self.font.render(msg, True, color)
-        self.screen.blit(text, coord)
-
-    def draw_line(self, start_coord, end_coord, color = (28,28,28)):
-        pygame.draw.line(self.screen, color, start_coord, end_coord)
-
-    def draw_point(self, coord, color = [242]*3):
-        self.screen.set_at(coord, color)
 
     def capture(self, frame):
         dname = os.environ['RECORD_DIR']
@@ -50,31 +34,65 @@ class Window:
             print fname, e
             raise
 
+    def display_fullscreen(self, surface):
+        self.screen.blit(surface, (0, 0))
+        pygame.display.update()
+
+    def display(self, surfaces):
+        for surface, coord in surfaces:
+            self.screen.blit(surface, coord)
+        pygame.display.update()
+
+class Window:
+    def __init__(self, window_size):
+        self.window = pygame.Surface(window_size)
+        self.font = pygame.font.SysFont(u'dejavusansmono', 18)
+        self.window_size = window_size
+
+    def fill(self, color = [0]*3):
+        self.window.fill(color)
+
+    def draw_msg(self, msg, coord = (5, 5), color = (180, 180, 255)):
+        text = self.font.render(msg, True, color)
+        self.window.blit(text, coord)
+
+    def draw_line(self, start_coord, end_coord, color = (28,28,28)):
+        pygame.draw.line(self.window, color, start_coord, end_coord)
+
+    def draw_point(self, coord, color = [242]*3):
+        self.window.set_at(coord, color)
+
 class ComplexPlane(Window):
+    def __init__(self, window_size):
+        Window.__init__(self, window_size)
+        self.set_view(center = 0j, radius = 1.5)
+
     def set_view(self, center = None, radius = None):
         if center is not None:
             self.center = center
         if radius is not None:
+            if radius == 0:
+                raise RuntimeError("Radius can't be null")
             self.radius = radius
         plane_min = (self.center.real - self.radius, self.center.imag - self.radius)
         plane_max = (self.center.real + self.radius, self.center.imag + self.radius)
         # Coordinate conversion vector
         self.offset = (plane_min[0], plane_min[1])
         self.scale = (
-            self.screen_size[0] / float(plane_max[0] - plane_min[0]),
-            self.screen_size[1] / float(plane_max[1] - plane_min[1])
+            self.window_size[0] / float(plane_max[0] - plane_min[0]),
+            self.window_size[1] / float(plane_max[1] - plane_min[1])
         )
 
     def convert_to_plane(self, screen_coord):
         return complex(
             screen_coord[0] / self.scale[0] + self.offset[0],
-            ((self.screen_size[1] - screen_coord[1]) / self.scale[1] + self.offset[1])
+            ((self.window_size[1] - screen_coord[1]) / self.scale[1] + self.offset[1])
         )
 
     def convert_to_screen(self, plane_coord):
         return [
             int((plane_coord.real - self.offset[0]) * self.scale[0]),
-            self.screen_size[1] - int((plane_coord.imag - self.offset[1]) * self.scale[1])
+            self.window_size[1] - int((plane_coord.imag - self.offset[1]) * self.scale[1])
         ]
 
     def draw_complex(self, complex_coord, color = [242]*3):
@@ -84,11 +102,11 @@ class ComplexPlane(Window):
         center_coord = self.convert_to_screen(0j)
         self.draw_line(
             (center_coord[0], 0),
-            (center_coord[0], self.screen_size[1]),
+            (center_coord[0], self.window_size[1]),
             color = axis_color)
         self.draw_line(
             (0, center_coord[1]),
-            (self.screen_size[0], center_coord[1]),
+            (self.window_size[0], center_coord[1]),
             color = axis_color)
 
 def rotate_point(point, angle):
@@ -229,6 +247,7 @@ class AudioMod:
 
 def main(argv):
     WINSIZE = (600, 600)
+    screen = Screen(WINSIZE)
     plane = ComplexPlane(WINSIZE)
 
     src_path = N.array((0j, -1j, 0j, 1j, 0j, -1-1j))
@@ -257,7 +276,8 @@ def main(argv):
         for point in path.gen_splines():
             plane.draw_complex(point, color=(120,10,50))
 
-        pygame.display.update()
+        screen.display(((plane.window, (0,0)),))
+
         for e in pygame.event.get():
             if e.type == KEYDOWN and e.key == K_ESCAPE:
                 exit(0)

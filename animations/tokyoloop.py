@@ -28,12 +28,13 @@ class JuliaSet:
         self.max_iter = 69 * 6
         self.effective_max_iter = 69
         self.hue = 0.40
+        self.screen = Screen(WINSIZE)
 
     def render(self, plane, frame):
         start_time = time.time()
         plane.fill((0, 0, 0))
         self.draw_fractal(plane, frame)
-        pygame.display.update()
+        self.screen.display_fullscreen(plane.window)
         print "%04d: %.2f sec: c/center/radius = '%s' '%s' %s" % (frame, time.time() - start_time, self.c, plane.center, plane.radius)
 
     def draw_fractal(self, plane, frame):
