@@ -2,56 +2,36 @@
 # Licensed under the Apache License, Version 2.0
 
 # This is a basic Julia set explorer
-import math, pygame, os, time, colorsys, sys, random
-from pygame.locals import *
-import pygame.draw, pygame.image
-
 from utils import *
 
-#constants
-WINSIZE = map(lambda x: x*SIZE, [ 100,  100])
-CENTER  = map(lambda x: x/2, WINSIZE)
 
-PHI=(1+math.sqrt(5))/2.0
-
-class JuliaSet:
-    def __init__(self, c = complex(0, 0), escape_limit=1e100, max_iter=69):
+class JuliaSet(Window, ComplexPlane):
+    def __init__(self, window_size, c = complex(0, 0), escape_limit=1e100, max_iter=69):
+        Window.__init__(self, window_size)
         self.c = c
-        self.escape_limit = escape_limit
-        self.max_iter = max_iter
+        self.max_iter = 69.
+        self.color_vector = np.vectorize(grayscale_color_factory(self.max_iter))
+        self.set_view(0j, 3)
 
-    def render(self, plane, frame):
+    def render(self, frame):
         start_time = time.time()
-        plane.fill((0, 0, 0))
-        self.draw_fractal(plane)
-        plane.draw_axis()
-        self.draw_function_msg(plane)
-        self.draw_cpoint(plane)
-        print "%04d: %.2f sec: c/center/radius = '%s' '%s' %s" % (frame, time.time() - start_time, self.c, plane.center, plane.radius)
+        nparray = compute(complex_fractal, [self.window_size, self.offset, self.scale, self.max_iter, self.c, self.length])
+        self.blit(self.color_vector(nparray))
+        self.draw_axis()
+        self.draw_function_msg()
+        self.draw_cpoint()
+        print "%04d: %.2f sec: JuliaSet(c/center/radius = '%s' '%s' %s )" % (frame, time.time() - start_time, self.c, self.center, self.radius)
 
-    def draw_fractal(self, plane):
-        for y in xrange(WINSIZE[1]):
-            for x in xrange(WINSIZE[0]):
-                z = plane.convert_to_plane((x, y))
-                for i in xrange(0, self.max_iter):
-                    z = z * z + self.c
-                    if abs(z.real) > self.escape_limit or abs(z.imag) > self.escape_limit:
-                        break
-                if i + 1 == self.max_iter:
-                    continue
-                color = tuple([255 * i / float(self.max_iter)] * 3)
-                plane.draw_point((x,y), color)
-
-    def draw_function_msg(self, plane):
+    def draw_function_msg(self):
         if self.c.real >= 0: r_sign = "+"
         else:                r_sign = ""
         if self.c.imag >= 0: i_sign = "+"
         else:                i_sign = ""
         self.c_str = "z*z%s%.5f%s%.5fj" % (r_sign, self.c.real, i_sign, self.c.imag)
-        plane.draw_msg(self.c_str)
+        self.draw_msg(self.c_str)
 
-    def draw_cpoint(self, plane):
-        plane.draw_complex(self.c, (255, 0, 0))
+    def draw_cpoint(self):
+        self.draw_complex(self.c, (255, 0, 0))
 
 seeds = (
     complex(PHI, PHI),
@@ -67,7 +47,6 @@ seeds = (
     (0.28200+0.48000j),
 )
 
-
 def main(argv):
     if len(argv) == 1:
         print "JuliaSet explorer"
@@ -80,39 +59,40 @@ def main(argv):
     pygame.init()
     screen = Screen(WINSIZE)
     clock = pygame.time.Clock()
-    plane = ComplexPlane(WINSIZE)
-    screen.add(plane)
     c = random.choice(seeds)
     # Usage allow reuse of frame definition (c, plane center, radius)
     if len(argv) >= 2: c = complex(argv[1])
-    if len(argv) >= 3: plane.set_view(center = complex(argv[2]))
-    if len(argv) >= 4: plane.set_view(radius = float(argv[3]))
+    if len(argv) >= 3: scene.set_view(center = complex(argv[2]))
+    if len(argv) >= 4: scene.set_view(radius = float(argv[3]))
 
-    scene = JuliaSet(c)
+    scene = JuliaSet(WINSIZE, c)
+    screen.add(scene)
     frame = 0
     redraw = True
     while True:
         if redraw:
             frame += 1
-            scene.render(plane, frame)
+            scene.render(frame)
             screen.update()
+            pygame.display.update()
             redraw = False
             if "RECORD_DIR" in os.environ:
-                screen.capture(frame)
+                screen.capture(frame, os.environ["RECORD_DIR"])
 
         for e in pygame.event.get():
             if e.type not in (KEYDOWN, MOUSEBUTTONDOWN):
                 continue
             if e.type == MOUSEBUTTONDOWN:
-                plane_coord = plane.convert_to_plane(e.pos)
+                plane_coord = scene.convert_to_plane(e.pos)
                 if e.button in (1, 3):
                     if e.button == 1:
                         step = 3/4.0
                     else:
                         step = 4/3.0
-                    plane.set_view(center = plane_coord, radius = plane.radius * step)
+                    scene.set_view(center = plane_coord, radius = scene.radius * step)
                     redraw = True
-
+                else:
+                    print "Clicked", e.pos
             else:
                 if e.key == K_ESCAPE:
                     exit(0)
@@ -122,22 +102,22 @@ def main(argv):
                 elif e.key in (K_a, K_e):
                     if   e.key == K_a: step = 3/4.0
                     elif e.key == K_e: step = 4/3.0
-                    plane.set_view(radius = plane.radius * step)
+                    scene.set_view(radius = scene.radius * step)
                 elif e.key in (K_z,K_s,K_q,K_d):
                     fact = 20
-                    if   e.key == K_z: step = complex(0,  fact/plane.scale[1])
-                    elif e.key == K_s: step = complex(0, -fact/plane.scale[1])
-                    elif e.key == K_q: step = -fact/plane.scale[0]
-                    elif e.key == K_d: step =  fact/plane.scale[0]
+                    if   e.key == K_z: step = complex(0,  fact/scene.scale[1])
+                    elif e.key == K_s: step = complex(0, -fact/scene.scale[1])
+                    elif e.key == K_q: step = -fact/scene.scale[0]
+                    elif e.key == K_d: step =  fact/scene.scale[0]
                     scene.c += step
                 elif e.key in (K_LEFT,K_RIGHT,K_DOWN,K_UP):
-                    if   e.key == K_LEFT:  step = -10/plane.scale[0]
-                    elif e.key == K_RIGHT: step = +10/plane.scale[0]
-                    elif e.key == K_DOWN:  step = complex(0, -10/plane.scale[1])
-                    elif e.key == K_UP:    step = complex(0,  10/plane.scale[1])
-                    plane.set_view(center = plane.center + step)
+                    if   e.key == K_LEFT:  step = -10/scene.scale[0]
+                    elif e.key == K_RIGHT: step = +10/scene.scale[0]
+                    elif e.key == K_DOWN:  step = complex(0, -10/scene.scale[1])
+                    elif e.key == K_UP:    step = complex(0,  10/scene.scale[1])
+                    scene.set_view(center = scene.center + step)
                 elif e.key == K_r:
-                    plane.set_view(center = 0j, radius = 1.5)
+                    scene.set_view(center = 0j, radius = 1.5)
                 else:
                     redraw = False
                     continue
@@ -148,3 +128,6 @@ if __name__ == "__main__":
         main(sys.argv)
     except KeyboardInterrupt:
         pass
+    pool.terminate()
+    pool.join()
+    del pool
