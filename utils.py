@@ -34,18 +34,18 @@ def hsv(h, s, v):
 def grayscale(r):
     return int(r * 0xff) | int((r * 0xff)) << 8 | int(r * 0xff) << 16
 
-def dark_color_factory(scale):
+def dark_color_factory(scale, dummy):
     def dark_color(x):
         if x == scale:
             return 0
         return hsv(0.6 + 0.4 * x / (2 * scale), 0.7, 0.5)
     return dark_color
 
-def bright_color_factory(scale):
+def bright_color_factory(scale, base_hue = 0.4):
     def bright_color(x):
         if x == scale:
             return 0
-        return hsv(0.4 + x / (6/10. * scale), 0.7, 0.7)
+        return hsv(base_hue + x / (6/10. * scale), 0.7, 0.7)
     return bright_color
 
 def grayscale_color_factory(scale):
@@ -387,6 +387,16 @@ class Path:
         for idx in xrange(len(self.points) - 1):
             yield (self.points[idx], self.points[idx + 1])
 
+    def logs(self):
+        path = []
+        for a, b in self.points_pairs():
+            for point in np.logspace(np.log10(a), np.log10(b), self.size / self.len_pairs):
+                path.append(point)
+        return path
+    def gen_logs(self):
+        logs = self.logs()
+        for c in logs: yield c
+
     def lines(self):
         path = []
         for a, b in self.points_pairs():
@@ -431,11 +441,14 @@ class Path:
         path = self.splines()
         for c in path: yield c
 
+class Plane(ComplexPlane, Window):
+    pass
 
 def main(argv):
     WINSIZE = (600, 600)
     screen = Screen(WINSIZE)
-    plane = ComplexPlane(WINSIZE)
+    plane = Plane(WINSIZE)
+    plane.set_view(0, 3)
     screen.add(plane)
 
     src_path = np.array((0j, -1j, 0j, 1j, 0j, -1-1j))
@@ -457,6 +470,9 @@ def main(argv):
 
         for point in path.gen_lines():
             plane.draw_complex(point)
+
+        for point in path.gen_logs():
+            plane.draw_complex(point, color=(0,96,96))
 
         for point in path.gen_sin(0.2 * math.cos(frame / 7.0), 7 * (abs(math.sin(frame / 60.0)))):
             plane.draw_complex(point, color=(42,120,23))
