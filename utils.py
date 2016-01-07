@@ -45,7 +45,7 @@ def bright_color_factory(scale, base_hue = 0.4):
     def bright_color(x):
         if x == scale:
             return 0
-        return hsv(base_hue + x / (6/10. * scale), 0.7, 0.7)
+        return hsv(base_hue + x / scale, 0.7, 0.7)
     return bright_color
 
 def grayscale_color_factory(scale):
@@ -76,10 +76,10 @@ def complex_fractal(param):
     while pos < step_size:
         step_pos = pos + chunk * step_size
         screen_coord = (step_pos / window_size[1], step_pos % window_size[1])
-        z = complex(
+        z = np.complex128(complex(
             screen_coord[0] / scale[0] + offset[0],
             ((window_size[1] - screen_coord[1]) / scale[1] + offset[1])
-        )
+        ))
         if c is None:
             # Mandelbrot set
             u = 0

@@ -17,8 +17,8 @@ class Fractal(ScreenPart, ComplexPlane):
         ScreenPart.__init__(self, window_size)
         self.c = c
         self.set_view(0j, 1)
-        self.max_iter = 69.
-        self.hue = 0.4
+        self.max_iter = 73.
+        self.hue = 0.5
         self.last_view = None
         self.color_vector = color_vector
 
@@ -76,7 +76,6 @@ class Modulator(ScreenPart):
         self.min_angle = 0
         self.max_angle = 360
         self.sign = 1
-
         self.scenes = [
             [end_frame, self.fadeout],
             #[4457,      self.ending],
@@ -249,7 +248,6 @@ class Modulator(ScreenPart):
 
     def brk01(self):
         if self.scene_init:
-            self.max_iter = 69
             self.brk_zoom_length = self.scene_length + 96
             self.brk_zoom_start = self.scene_start
             self.mod_center = -0.485642857143+0.604142857143j
@@ -295,19 +293,21 @@ class Modulator(ScreenPart):
             self.mod_center = (-0.530133928571+0.668165178571j)
             self.c_path = np.linspace(self.main_ft.c, self.mod_center, self.scene_length)
             self.cos_win_scale = np.pi / 2. / self.scene_length
-            self.hue_path = np.logspace(np.log10(self.main_ft.hue), np.log10(0.1), self.scene_length)
+            self.hue_path = np.logspace(np.log10(self.main_ft.hue), np.log10(0.4), self.scene_length)
+            self.max_iter_path = np.linspace(self.main_ft.max_iter, 128., self.scene_length)
 
         new_c = self.linspace(self.main_ft.c, self.mod_center) + complex(0.2 * self.mid_speed) * np.cos(self.scene_pos * self.cos_win_scale) + complex(0, -0.1*self.mid_speed) * np.cos(self.scene_pos * self.cos_win_scale)
         self.main_ft.c += (new_c - self.main_ft.c) / 5.
         self.move_view(self.debug_ft, center=self.mod_center, radius=0.008)
         self.move_view(self.main_ft, center=0j, radius=0.13)
         self.main_ft.hue = self.hue_path[self.scene_pos]
+        self.main_ft.max_iter = float(int(self.max_iter_path[self.scene_pos]))
 
     def main_th(self):
         #self.move_view(self.debug_ft, radius=0.008, length=42)
         if self.scene_init:
-            mc = self.mod_center
-            s = 0.004
+            mc = self.mod_center + 0.002j
+            s = 0.007
             self.m_path = Path((
                     mc-complex(0, s+0.001), mc - s, mc + complex(0, s+0.001), mc+s+0.002, mc-complex(0, s+0.001)
                 ), self.scene_length * 2)
@@ -317,19 +317,19 @@ class Modulator(ScreenPart):
         # main_th
         self.path_pos += 8 * self.high_speed
         new_c = self.c_path[int(self.path_pos % (self.scene_length * 2))]
-        new_c += (self.mod_center - new_c) * self.freqs[LOWF][0]
-        self.main_ft.c += (new_c - self.main_ft.c) / 4.0
+        new_c += (self.mod_center - new_c) * self.freqs[LOWF][0] * 1.4
+        self.main_ft.c += (new_c - self.main_ft.c) / 5.0
 
     def brk03(self):
         if self.scene_init:
             self.cos_win_scale = np.pi / 2. / self.scene_length
             self.c_path = np.linspace(self.main_ft.c, (-0.562907929095+0.641504235883j), self.scene_length)
-            self.hue_path = np.linspace(self.main_ft.hue, 0.4, self.scene_length)
+#            self.hue_path = np.linspace(self.main_ft.hue, 0.3, self.scene_length)
         self.move_view(self.debug_ft, center = (-0.562907929095+0.641504235883j), radius = 0.0410525522232)
         self.move_view(self.main_ft, center = 0j, radius = 0.368940544128)
         new_c = self.c_path[self.scene_pos] + complex(0, 0.05 * self.mid_speed) * np.cos(self.scene_pos * self.cos_win_scale)
         self.main_ft.c += (new_c - self.main_ft.c) / 4.
-        self.main_ft.hue = self.hue_path[self.scene_pos]
+#        self.main_ft.hue = self.hue_path[self.scene_pos]
 
 
     def deep_th(self):
@@ -353,46 +353,41 @@ class Modulator(ScreenPart):
 
     def brk04(self):
         if self.scene_init:
+            self.mod_center = -0.62246875+0.4265625j
             self.cos_win_scale = np.pi / 2. / self.scene_length
-        self.move_view(self.main_ft, radius = 1.5, length = self.scene_length / 2.)
-        self.move_view(self.debug_ft, center = -0.3+0j)
-        self.move_view(self.debug_ft, radius = 1.5, length = self.scene_length / 4.)
-        new_c = self.linspace(self.main_ft.c, -0.892857142857+0.248857142857j) + complex(0, -0.2 * self.freqs[LOWF][0]) * np.cos(self.scene_pos * self.cos_win_scale)
+            self.hue_path = np.logspace(np.log10(self.main_ft.hue), np.log10(0.5), self.scene_length)
+            self.max_iter_path = np.linspace(self.main_ft.max_iter, 73., self.scene_length)
+        self.move_view(self.main_ft, radius = 1.6875) #, length = self.scene_length / 2.)
+        self.move_view(self.debug_ft, center = self.mod_center, length = self.scene_length / 3.)
+        self.move_view(self.debug_ft, radius = 0.08125, length = self.scene_length / 4.)
+        new_c = self.linspace(self.main_ft.c, (-0.605+0.44159375j)) + complex(0, -0.2 * self.freqs[LOWF][0]) * np.cos(self.scene_pos * self.cos_win_scale)
         self.main_ft.c += (new_c - self.main_ft.c) / 5.0
+        self.main_ft.hue = self.hue_path[self.scene_pos]
+        self.main_ft.max_iter = float(int(self.max_iter_path[self.scene_pos]))
 
     def end_th(self):
-        # TODO: reduce radius when angle >30 < 80
         if self.scene_init:
-            self.mod_center = -0.730666666667+0.0173333333333j
+            self.min_r = 0.015
+            self.max_r = 0.05
             self.mod_radius = 0.98
+            self.angle = 40
+            self.min_angle = 40
+            self.max_angle = 146
 
-        self.angle = (90 + self.scene_pos + self.high_speed * 2)
-        angle = (self.angle - 250) % 360
-
-
-        r = 0
-        print
-        if angle >= 0 and angle < 200:
-            print "Adjusting...", self.angle
-            r = 1 * np.sin(angle * np.pi / 2. / 120.)
-        else:
-            print "Not adjusting...", self.angle
-        lowf = self.freqs[LOWF][0] * 2
-        d = self.mod_radius + r - (r+1) * 0.3 * lowf
-        modc = self.mod_center + 0.1 * (self.mid_speed - 0.5)
-
+        self.angle = self.angle + self.sign * self.high_speed
+        d = self.max_r - (self.max_r - self.min_r) * self.freqs[LOWF][0]
         new_c = self.mod_center + cmath.rect(d, math.radians(self.angle % 360))
-
         self.main_ft.c += (new_c - self.main_ft.c) / (5.0) #* (0.1  + 1 * self.scene_pos / self.scene_length)
+        self.move_view(self.main_ft, radius = 0.2)
 
     def ending(self):
         pass
 
     def fadeout(self):
         if self.scene_init:
-            self.c_path = np.linspace(self.main_ft.c, 4+0j, self.scene_length)
+            self.c_path = np.linspace(self.main_ft.c, -5+0j, self.scene_length)
         self.move_view(self.main_ft, center = 0j, radius = 3.0)
-        self.move_view(self.debug_ft, center = 0j, radius=3.5)
+        self.move_view(self.debug_ft, center = 0j, radius = 3.5)
         self.main_ft.c = self.c_path[self.scene_pos]
 
     def render(self, debug_ft):
@@ -429,6 +424,7 @@ def main(argv):
     parser.add_argument("--stop", type=int, default=9001)
     parser.add_argument("--debugo", action="store_const", const=True)
     parser.add_argument("--debug", action="store_const", const=True)
+    parser.add_argument("--single", action="store_const", const=True)
     parser.add_argument("--record", type=str)
     args = parser.parse_args()
 
@@ -486,6 +482,8 @@ def main(argv):
         main_ft = Fractal(WINSIZE)
         screen.add(main_ft)
 
+    debug_ft.max_iter = 69.
+
     if args.record:
         dname = args.record
         args.play = None
@@ -540,6 +538,10 @@ def main(argv):
             sys.stdout.write(status_line)
             sys.stdout.flush()
             elapsed = end_time - start_time
+            if args.single:
+                raw_input("Press enter to quit")
+                exit()
+
 
         if frame == start_frame and args.play:
             sound = pygame.mixer.Sound(array = wav[audio_frames[start_frame]:])
